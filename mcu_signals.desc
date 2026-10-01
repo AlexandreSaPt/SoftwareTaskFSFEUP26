@@ -1,0 +1,6 @@
+
+p
+mcu_signals.protomcu"N
+RawAdcSensor!
+timestamp_ns (RtimestampNs
+	adc_value (RadcValuebproto3
