@@ -25,7 +25,7 @@
             "value": 59.4384735571232,
             "min": 0,
             "max": 100,
-            "noise": true,
+            "noise": false,
             "std_dev": 1
         }
     },
