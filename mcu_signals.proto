@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-package mcu;
-
-// A universal message for any raw ADC pin reading
-message RawAdcSensor {
-  uint64 timestamp_ns = 1;
-  uint32 adc_value = 2; // Raw integer from the ADC (e.g., 0-4095)
-}

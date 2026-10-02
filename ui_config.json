@@ -1,0 +1,40 @@
+{
+    "sliders": {
+        "A": {
+            "value": 54.8525396574678,
+            "min": 0,
+            "max": 100,
+            "noise": false,
+            "std_dev": 1
+        },
+        "AB": {
+            "value": 35.8152764996235,
+            "min": 0,
+            "max": 100,
+            "noise": false,
+            "std_dev": 1
+        },
+        "Hey": {
+            "value": 37.547059315653,
+            "min": 0,
+            "max": 100,
+            "noise": false,
+            "std_dev": 1
+        },
+        "Throttle": {
+            "value": 59.4384735571232,
+            "min": 0,
+            "max": 100,
+            "noise": true,
+            "std_dev": 1
+        }
+    },
+    "buttons": {
+        "aaa": {
+            "value": false
+        },
+        "Fire_Laser": {
+            "value": false
+        }
+    }
+}
