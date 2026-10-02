@@ -5,7 +5,7 @@ These instructions are for Fedora Linux.Should work with Debian with correct mod
 ### 1. Install the system dependencies
 
 ```bash
-sudo dnf install python3 python3-tkinter
+sudo dnf install python3
 ```
 
 ### 2. Create and activate a virtual environment
@@ -31,10 +31,18 @@ python -m pip install foxglove-websocket
 With the virtual environment active, run the project's Python entry point, for example:
 
 ```bash
-python <entry_point>.py
+python web_ui_stream.py
 ```
 
-Replace `<entry_point>.py` with the Python file that starts the application.
+### 5. Connecting
+Once running, the script hosts several services locally:
+
+- Web UI Dashboard: Open http://localhost:8000 in your browser.
+
+- Foxglove Studio: Open Foxglove, click "Open Connection", select Foxglove WebSocket, and connect to ws://localhost:8765.
+
+- C++ Engine UDP Ports: The Python server listens for C++ telemetry on port 9001 and sends UI commands to C++ on port 9000.
+
 
 To leave the virtual environment when finished:
 
