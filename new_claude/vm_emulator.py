@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
-vm_emulator.py  -  stands in for the real VM so the C++ code can be tested.
+vm_emulator.py  -  the full Vehicle Model (vm_server.py) running all the time, plus manual OVERRIDES.
 
- * Every signal the VM sends (listed in vm_signals.json) is created as a slider / button
-   (raw ADC value 0..65535, buttons 0/1). You set them by hand instead of simulating a car.
- * You can add more sliders / buttons and choose the Foxglove topic (and JSON key) each one goes to.
-   Components that share a topic are merged in one message: {"key1": v1, "key2": v2, ...}
-   A key with dots is nested: "wheel_speed.fl" -> {"wheel_speed": {"fl": v}}
- * UDP to C++ (127.0.0.1:9000, 100 Hz) has the SAME format as vm_server.py: the topic tree, e.g.
-        {"sensors": {"vm": {"brake_pressure": 123, "wheel_speed": {"fl": 0, ...}}, "other": {"ATS_btn": 1}}}
- * UDP from C++ (127.0.0.1:9001) is forwarded to Foxglove exactly as in vm_server.py:
-        {"actuators": {"motor_torque": 120.0, ...}}  -> /actuators   (all actuators in one message)
-        {"CAN": {"MCU_OUT": {...}}}                  -> /CAN/MCU_OUT
+ * The VM runs exactly as in vm_server.py: same physics, shutdown circuit, noise, topics and UDP packets.
+   vm_server.py must be in the same folder (it is imported), so any change you make there applies here too.
+ * Every sensor of the VM is a slider (raw ADC value 0..65535) with an OVERRIDE switch:
+       switch off : the slider follows the live value computed by the VM
+       switch on  : the slider value replaces that sensor's reading (the VM keeps running underneath)
+   Overrides are always off when the emulator starts.
+ * ATS / R2D are hold-buttons: they are the physical inputs, so they always set the reading.
+ * "Vehicle inputs" (throttle, steering, brake) and the 3 shutdown relays are here too, as in vm_server.py.
+ * You can still add your own sliders / buttons and choose the Foxglove topic (and JSON key) of each one.
+   Custom components are always active. Components that share a topic are merged in one message;
+   a key with dots is nested: "wheel_speed.fl" -> {"wheel_speed": {"fl": v}}
+   (a custom component on /sensors/vm or /sensors/other adds / replaces that field).
+ * UDP to C++ (127.0.0.1:9000, 200 Hz) and from C++ (127.0.0.1:9001) are the same as vm_server.py.
 
 Run:  python3 vm_emulator.py        (UI on http://localhost:8000)
 Settings are saved in emulator_config.json. Signals that are in vm_signals.json but missing in the
-saved settings are added at start-up (deleting a pre-filled component brings it back at next start).
-If vm_signals.json changes version, the pre-filled components are rebuilt (your own ones are kept).
+saved settings are added at start-up. If vm_signals.json changes version, the pre-filled components
+are rebuilt (your own ones are kept).
 """
 import asyncio
 import json
@@ -32,6 +35,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import websockets
 from foxglove_websocket.server import FoxgloveServer
 
+import vm_server as vm                                  # the Vehicle Model
+from vm_server import DynamicChannel, set_in_tree
+
 # ==========================================
 # 0. PARAMETERS
 # ==========================================
@@ -39,10 +45,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SIGNALS_FILE = os.path.join(HERE, "vm_signals.json")
 CONFIG_FILE = "emulator_config.json"
 
-EMU_HZ = 100                    # UDP rate to C++
-PUBLISH_DIV = 2                 # Foxglove rate = EMU_HZ / PUBLISH_DIV = 50 Hz
-UDP_TO_CPP = ("127.0.0.1", 9000)
-UDP_FROM_CPP = ("127.0.0.1", 9001)
+SIM_HZ = vm.SIM_HZ              # same rate as the VM
+BROWSER_DIV = 10                # live values to the browser: SIM_HZ/10 = 20 Hz
+UDP_TO_CPP = vm.UDP_TO_CPP
+UDP_FROM_CPP = vm.UDP_FROM_CPP
 
 
 def clamp(x, lo, hi):
@@ -79,59 +85,12 @@ def set_path(d, path, value):
     d[parts[-1]] = value
 
 
-# ==========================================
-# 1. FOXGLOVE HELPERS
-# ==========================================
-def schema_of(v):
-    if isinstance(v, bool):
-        return {"type": "boolean"}
-    if isinstance(v, (int, float)):
-        return {"type": "number"}
-    if isinstance(v, str):
-        return {"type": "string"}
-    if isinstance(v, dict):
-        return {"type": "object", "properties": {k: schema_of(x) for k, x in v.items()}}
-    if isinstance(v, list):
-        return {"type": "array", "items": schema_of(v[0]) if v else {}}
-    return {}
-
-
-class DynamicChannel:
-    def __init__(self, server, topic):
-        self.server = server
-        self.topic = topic
-        self.chan_id = None
-        self.sig = None
-
-    async def send(self, ts_ns, payload):
-        schema = {"type": "object", "properties": {k: schema_of(v) for k, v in payload.items()}}
-        sig = json.dumps(schema, sort_keys=True)
-        if sig != self.sig:
-            await self.close()
-            self.chan_id = await self.server.add_channel({
-                "topic": self.topic,
-                "encoding": "json",
-                "schemaName": self.topic.strip("/").replace("/", "_"),
-                "schema": json.dumps(schema),
-            })
-            self.sig = sig
-        await self.server.send_message(self.chan_id, ts_ns, json.dumps(payload).encode("utf8"))
-
-    async def close(self):
-        if self.chan_id is not None:
-            await self.server.remove_channel(self.chan_id)
-            self.chan_id = None
-            self.sig = None
-
-
-def set_in_tree(tree, topic, payload):
-    parts = [p for p in topic.split("/") if p]
-    if not parts:
-        return
-    node = tree
-    for p in parts[:-1]:
-        node = node.setdefault(p, {})
-    node.setdefault(parts[-1], {}).update(payload)
+def get_path(d, path):
+    for p in path.split("."):
+        if not isinstance(d, dict) or p not in d:
+            return None
+        d = d[p]
+    return d
 
 
 # ==========================================
@@ -165,6 +124,7 @@ def normalise_slider(name, d):
         "std_dev": sd if math.isfinite(sd) else 1.0,
         "integer": bool(d.get("integer", False)),
         "from_vm": bool(d.get("from_vm", False)),
+        "override": bool(d.get("override", False)),      # only used by the pre-filled VM sensors
     }
 
 
@@ -183,7 +143,10 @@ def normalise_state(s):
     s = s if isinstance(s, dict) else {}
     sl = s.get("sliders") if isinstance(s.get("sliders"), dict) else {}
     bt = s.get("buttons") if isinstance(s.get("buttons"), dict) else {}
+    base = vm.normalise_state(s)                         # vehicle inputs + shutdown relays
     return {
+        "inputs": base["inputs"],
+        "relays": base["relays"],
         "sliders": {clean_name(n, "x"): normalise_slider(clean_name(n, "x"), d) for n, d in sl.items()},
         "buttons": {clean_name(n, "x"): normalise_button(clean_name(n, "x"), d) for n, d in bt.items()},
     }
@@ -238,6 +201,10 @@ if os.path.exists(CONFIG_FILE):
         UI_STATE = normalise_state(raw_cfg)
         for b in UI_STATE["buttons"].values():
             b["value"] = False
+        for d in UI_STATE["sliders"].values():
+            d["override"] = False                        # never start with a sensor silently overridden
+        fresh = vm.normalise_state({})                    # pedals released, relays closed
+        UI_STATE["inputs"], UI_STATE["relays"] = fresh["inputs"], fresh["relays"]
         if SIGNALS_DESC and raw_cfg.get("_signals_version") != SIGNALS_VERSION:
             # vm_signals.json changed: rebuild the pre-filled components, keep the user's own
             for group in ("sliders", "buttons"):
@@ -256,6 +223,7 @@ CLIENTS = set()
 async def ui_ws_handler(websocket, *args, **kwargs):
     global UI_STATE
     await websocket.send(json.dumps(UI_STATE))
+    CLIENTS.add(websocket)
     try:
         async for message in websocket:
             try:
@@ -265,37 +233,16 @@ async def ui_ws_handler(websocket, *args, **kwargs):
                 pass
     except websockets.exceptions.ConnectionClosed:
         pass
+    finally:
+        CLIENTS.discard(websocket)
 
 
-# ==========================================
-# 3. DATA FROM C++ (UDP)  -> forwarded to Foxglove
-# ==========================================
-ACT_RX = {}      # actuator name -> last value written by C++
-CAN_OUT = {}     # /CAN/MCU_OUT payload
-
-
-class CppUdpListener(asyncio.DatagramProtocol):
-    def __init__(self):
-        self.first_message = True
-
-    def datagram_received(self, data, addr):
-        global CAN_OUT
+async def broadcast_to_browsers(msg):
+    for ws in list(CLIENTS):
         try:
-            msg = json.loads(data.decode('utf-8'))
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return
-        if not isinstance(msg, dict):
-            return
-        acts = msg.get("actuators")
-        if isinstance(acts, dict):
-            for name, v in acts.items():
-                ACT_RX[clean_name(name, "x")] = v.get("value") if isinstance(v, dict) else v
-        can = msg.get("CAN")
-        if isinstance(can, dict) and isinstance(can.get("MCU_OUT"), dict):
-            CAN_OUT = can["MCU_OUT"]
-        if self.first_message:
-            print(f"✅ Received first packet from C++: {msg}")
-            self.first_message = False
+            await ws.send(msg)
+        except Exception:
+            CLIENTS.discard(ws)
 
 
 # ==========================================
@@ -398,6 +345,19 @@ HTML_PAGE = """
         .pad .tile-head { margin-bottom: 2px; }
         .pad .topic { margin-bottom: 10px; }
 
+        /* vehicle inputs / relays / override */
+        .tile.fixed { border-top: 2px solid var(--accent); }
+        .tile.fixed .tile-head { min-height: 28px; margin-bottom: 6px; }
+        .big-val small { font-size: 0.4em; color: var(--muted); margin-left: 6px; font-weight: 600; }
+        .relay-state.closed { color: var(--ok); }
+        .relay-state.open { color: var(--danger); }
+        .btn-ghost.small { padding: 4px 12px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+        .ovr-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.72em; letter-spacing: 1px; text-transform: uppercase; }
+        .ovr-label { color: var(--ok); font-weight: 600; }
+        .tile.overridden { border-color: var(--accent); }
+        .tile.overridden .ovr-label { color: var(--accent); }
+        .tile.live input[type=range] { opacity: .5; cursor: not-allowed; }
+        .tile.live .big-val { color: var(--muted); }
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
         .overlay.open { display: flex; }
         .modal { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: var(--radius); padding: 22px; width: 100%; max-width: 380px; }
@@ -441,6 +401,15 @@ HTML_PAGE = """
         </aside>
 
         <main>
+            <section class="group">
+                <h2 class="section-title">Vehicle inputs <button class="btn-ghost small" id="zero-all">Zero all</button></h2>
+                <div class="grid-sliders" id="grid-inputs"></div>
+            </section>
+            <section class="group">
+                <h2 class="section-title">Shutdown line (latching)</h2>
+                <div class="grid-sliders" id="grid-relays"></div>
+            </section>
+
             <div id="empty" class="empty">No components yet.</div>
             <section class="group" id="group-sliders" style="display:none">
                 <h2 class="section-title">Sliders <span class="count" id="count-sliders">0</span></h2>
@@ -473,7 +442,19 @@ HTML_PAGE = """
     </div>
 
     <script>
-        let state = { sliders: {}, buttons: {} };
+        const INPUT_DEFS = [
+            { key: 'throttle', label: 'Throttle',           unit: '%', min: 0,  max: 100 },
+            { key: 'steering', label: 'Steering',           unit: '',  min: -1, max: 1   },
+            { key: 'brake',    label: 'Brake pedal travel', unit: '%', min: 0,  max: 100 },
+        ];
+        const RELAY_DEFS = [
+            { key: 'dash',         label: 'Dash' },
+            { key: 'master_panel', label: 'Master panel' },
+            { key: 'bms',          label: 'BMS' },
+        ];
+        let state = { inputs: {}, relays: {}, sliders: {}, buttons: {} };
+        const liveValues = {};      // last live value of each pre-filled VM sensor
+        let liveRefs = {};          // name -> elements to update
         let ws;
         let isInitialized = false;
         let editing = null;
@@ -494,24 +475,125 @@ HTML_PAGE = """
             $('status').classList.toggle('online', online);
             $('status-text').innerText = online ? 'Connected' : 'Reconnecting...';
         }
+        function normaliseLoaded(loaded) {
+            const out = { inputs: {}, relays: {}, sliders: loaded.sliders || {}, buttons: loaded.buttons || {} };
+            INPUT_DEFS.forEach(f => {
+                const src = loaded.inputs && loaded.inputs[f.key];
+                const v = src ? parseFloat(src.value) : 0;
+                out.inputs[f.key] = { value: isNaN(v) ? 0 : v, min: f.min, max: f.max };
+            });
+            RELAY_DEFS.forEach(r => { out.relays[r.key] = !(loaded.relays && loaded.relays[r.key] === false); });
+            return out;
+        }
+
+        // ---------- vehicle inputs and relays (same as the VM page) ----------
+        function buildInputs() {
+            INPUT_DEFS.forEach(f => {
+                const tile = el(`
+                    <div class="tile fixed" id="input-${f.key}">
+                        <div class="tile-head"><span class="tile-name">${f.label}</span><button class="gear" title="Zero">⟲</button></div>
+                        <div class="big-val"><span class="v">0.00</span><small>${f.unit}</small></div>
+                        <div class="slider-wrap">
+                            <input type="range" min="${f.min}" max="${f.max}" step="any" value="0">
+                            <div class="bounds"><span>${f.min}</span><span>${f.max}</span></div>
+                        </div>
+                    </div>`);
+                tile.querySelector('input[type=range]').addEventListener('input', (e) => {
+                    if (!isInitialized) return;
+                    setInput(f.key, parseFloat(e.target.value));
+                    sendState();
+                });
+                tile.querySelector('.gear').addEventListener('click', () => {
+                    if (!isInitialized) return;
+                    setInput(f.key, 0);
+                    sendState();
+                });
+                $('grid-inputs').appendChild(tile);
+            });
+        }
+        function setInput(key, v) {
+            const f = INPUT_DEFS.find(x => x.key === key);
+            v = Math.max(f.min, Math.min(f.max, v));
+            state.inputs[key].value = v;
+            const tile = $('input-' + key);
+            tile.querySelector('.v').innerText = v.toFixed(2);
+            const range = tile.querySelector('input[type=range]');
+            range.value = v;
+            range.style.setProperty('--pct', pct(v, f.min, f.max) + '%');
+        }
+        $('zero-all').addEventListener('click', () => {
+            if (!isInitialized) return;
+            INPUT_DEFS.forEach(f => setInput(f.key, 0));
+            sendState();
+        });
+        function buildRelays() {
+            RELAY_DEFS.forEach(r => {
+                const tile = el(`
+                    <div class="tile fixed" id="relay-${r.key}">
+                        <div class="tile-head"><span class="tile-name">${r.label} relay</span>
+                            <label class="switch"><input type="checkbox" checked><span></span></label></div>
+                        <div class="big-val relay-state closed">CLOSED</div>
+                    </div>`);
+                const cb = tile.querySelector('input');
+                cb.addEventListener('change', () => {
+                    if (!isInitialized) { cb.checked = !cb.checked; return; }
+                    setRelay(r.key, cb.checked);
+                    sendState();
+                });
+                $('grid-relays').appendChild(tile);
+            });
+        }
+        function setRelay(key, closed) {
+            state.relays[key] = closed;
+            const tile = $('relay-' + key);
+            tile.querySelector('input').checked = closed;
+            const st = tile.querySelector('.relay-state');
+            st.innerText = closed ? 'CLOSED' : 'OPEN';
+            st.classList.toggle('closed', closed);
+            st.classList.toggle('open', !closed);
+        }
+        function syncFixed() {
+            INPUT_DEFS.forEach(f => setInput(f.key, state.inputs[f.key].value));
+            RELAY_DEFS.forEach(r => setRelay(r.key, state.relays[r.key]));
+        }
+
+        // ---------- live values of the VM sensors (only for sensors that are NOT overridden) ----------
+        function showSliderValue(ref, v) {
+            ref.range.value = v;
+            ref.big.innerText = v.toFixed(ref.dec);
+            ref.range.style.setProperty('--pct', pct(v, ref.min, ref.max) + '%');
+        }
+        function updateLive(live) {
+            Object.keys(live).forEach(name => {
+                liveValues[name] = live[name];
+                const ref = liveRefs[name];
+                if (ref && state.sliders[name] && !state.sliders[name].override) showSliderValue(ref, live[name]);
+            });
+        }
+
         function connectWS() {
             ws = new WebSocket("ws://" + window.location.hostname + ":8001");
             ws.onopen = () => setStatus(true);
             ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.live) { updateLive(msg.live); return; }      // never touches the controls
                 if (isInitialized) return;
-                const loaded = JSON.parse(event.data);
-                state = { sliders: loaded.sliders || {}, buttons: loaded.buttons || {} };
+                state = normaliseLoaded(msg);
                 isInitialized = true;
+                syncFixed();
                 render();
             };
             ws.onclose = () => { isInitialized = false; setStatus(false); setTimeout(connectWS, 1000); };
         }
+        buildInputs();
+        buildRelays();
         connectWS();
         function sendState() {
             if (ws && ws.readyState === WebSocket.OPEN && isInitialized) ws.send(JSON.stringify(state));
         }
 
         function render() {
+            liveRefs = {};
             const gs = $('grid-sliders'), gb = $('grid-buttons');
             gs.innerHTML = ''; gb.innerHTML = '';
             const sNames = Object.keys(state.sliders), bNames = Object.keys(state.buttons);
@@ -527,23 +609,52 @@ HTML_PAGE = """
         function sliderTile(name, d) {
             const min = d.min, max = d.max, val = d.value;
             const dec = d.integer ? 0 : 2;
+            const vmSig = !!d.from_vm;                 // pre-filled VM sensor: LIVE or OVERRIDE
             const tile = el(`
                 <div class="tile">
                     <div class="tile-head"><span class="tile-name">${name}</span><button class="gear" title="Edit">⚙</button></div>
                     <div class="topic">${d.topic} · ${d.key}</div>
+                    ${vmSig ? `<div class="ovr-row"><label class="switch"><input type="checkbox" class="ovr" ${d.override ? 'checked' : ''}><span></span></label><span class="ovr-label"></span></div>` : ''}
                     <div class="big-val ${d.noise ? 'noisy' : ''}">${parseFloat(val).toFixed(dec)}</div>
                     <div class="slider-wrap">
                         <input type="range" min="${min}" max="${max}" step="${d.integer ? 1 : 'any'}" value="${val}" style="--pct:${pct(val,min,max)}%">
                         <div class="bounds"><span>${min}</span><span>${max}</span></div>
                     </div>
                     <div class="noise-row">
-                        <label class="switch"><input type="checkbox" ${d.noise ? 'checked' : ''}><span></span></label>
+                        <label class="switch"><input type="checkbox" class="nz" ${d.noise ? 'checked' : ''}><span></span></label>
                         <span>White noise</span>
                         <span class="sd ${d.noise ? 'on' : ''}">σ <input type="number" step="0.1" value="${d.std_dev}"></span>
                     </div>
                 </div>`);
             const range = tile.querySelector('input[type=range]');
             const big = tile.querySelector('.big-val');
+            const ref = { range, big, min, max, dec };
+
+            function applyMode() {                      // LIVE (follows the VM) or OVERRIDE (slider decides)
+                if (!vmSig) return;
+                const ov = state.sliders[name].override;
+                range.disabled = !ov;
+                tile.classList.toggle('live', !ov);
+                tile.classList.toggle('overridden', ov);
+                tile.querySelector('.ovr-label').innerText = ov ? 'Override' : 'Live (VM)';
+            }
+            if (vmSig) {
+                liveRefs[name] = ref;
+                if (!d.override && liveValues[name] !== undefined) showSliderValue(ref, liveValues[name]);
+                tile.querySelector('.ovr').addEventListener('change', (e) => {
+                    const dd = state.sliders[name];
+                    dd.override = e.target.checked;
+                    // start the override from the value the VM is producing right now
+                    if (dd.override && liveValues[name] !== undefined) {
+                        dd.value = liveValues[name];
+                        showSliderValue(ref, dd.value);
+                    }
+                    applyMode();
+                    sendState();
+                });
+                applyMode();
+            }
+
             range.addEventListener('input', () => {
                 const v = parseFloat(range.value);
                 state.sliders[name].value = v;
@@ -551,7 +662,7 @@ HTML_PAGE = """
                 range.style.setProperty('--pct', pct(v, min, max) + '%');
                 sendState();
             });
-            const sw = tile.querySelector('.switch input');
+            const sw = tile.querySelector('.nz');
             sw.addEventListener('change', () => {
                 state.sliders[name].noise = sw.checked;
                 big.classList.toggle('noisy', sw.checked);
@@ -689,22 +800,70 @@ async def main():
     await websockets.serve(ui_ws_handler, "0.0.0.0", 8001)
 
     loop = asyncio.get_running_loop()
-    await loop.create_datagram_endpoint(lambda: CppUdpListener(), local_addr=UDP_FROM_CPP)
+    await loop.create_datagram_endpoint(lambda: vm.CppUdpListener(), local_addr=UDP_FROM_CPP)
     udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    vehicle = vm.VehicleModel()
+    sdc = vm.ShutdownSystem()
+    dt = 1.0 / SIM_HZ
 
     async with FoxgloveServer("0.0.0.0", 8765, "VM Emulator") as fg_server:
         print("🦊 Foxglove streaming live at ws://localhost:8765")
         chans = {}
-        dt = 1.0 / EMU_HZ
+
+        async def pub(topic, payload, ts):
+            ch = chans.get(topic)
+            if ch is None:
+                ch = chans[topic] = DynamicChannel(fg_server, topic)
+            await ch.send(ts, payload)
+
         next_tick = time.perf_counter()
         tick = 0
 
         while True:
             state = UI_STATE
+            inp = state["inputs"]
+            rel = state["relays"]
+            now_ns = time.time_ns()
+            act = dict(vm.ACT)                       # exactly what the C++ code last commanded
 
-            # ---------- 1. build one payload per topic ----------
-            topics = {}
+            # ---------- 1. the Vehicle Model (same steps as vm_server.py) ----------
+            sdc.update(dt,
+                       dash=rel["dash"], vcu=act["sdc_vcu_relay"],
+                       master_panel=rel["master_panel"], bms=rel["bms"],
+                       brake_bar=vehicle.brake_pressure_bar,
+                       motor_power_w=vehicle.motor_power_w)
+            torque_cmd = act["motor_torque"] if (sdc.closed or not vm.SDC_CUTS_MOTOR) else 0.0
+            vehicle.step(torque_cmd,
+                         float(inp["steering"]["value"]),
+                         float(inp["brake"]["value"]),
+                         dt)
+
+            real = vm.real_sensor_values(vehicle, inp, sdc)
+            groups = {"vm": {}, "other": {}}
+            for name, cfg in vm.ADC_SENSORS.items():
+                groups[cfg["group"]][name] = vm.sample_sensor(cfg, real[name], vm.noise_lsb(name))
+            for name, cfg in vm.DIGITAL_SENSORS.items():
+                groups[cfg["group"]][name] = 0       # buttons: set by the button components below
+            topics = {vm.sensor_topic(g): p for g, p in groups.items()}
+
+            can_in = vm.build_can_in(vehicle, sdc)
+            if can_in:
+                topics.setdefault("/CAN/MCU_IN", {}).update(can_in)
+
+            # ---------- 2. live values for the browser (BEFORE the overrides) ----------
+            live = {}
+            if tick % BROWSER_DIV == 0 and CLIENTS:
+                for name, d in state["sliders"].items():
+                    if d.get("from_vm"):
+                        v = get_path(topics.get(d["topic"], {}), d["key"])
+                        if v is not None:
+                            live[name] = v
+
+            # ---------- 3. overrides and custom components ----------
             for d in state["sliders"].values():
+                if d.get("from_vm") and not d.get("override"):
+                    continue                          # pre-filled VM sensor, not overridden: keep the VM value
                 val = float(d["value"])
                 if d.get("noise"):
                     val += random.gauss(0.0, float(d.get("std_dev", 1.0)))
@@ -716,38 +875,29 @@ async def main():
                 val = bool(d["value"])
                 set_path(topics.setdefault(d["topic"], {}), d["key"], int(val) if d.get("integer") else val)
 
-            # ---------- 2. Foxglove ----------
-            if tick % PUBLISH_DIV == 0:
-                now_ns = time.time_ns()
-                for topic, payload in topics.items():
-                    ch = chans.get(topic)
-                    if ch is None:
-                        ch = chans[topic] = DynamicChannel(fg_server, topic)
-                    await ch.send(now_ns, payload)
-
-                # actuators / CAN written by the C++ code
-                fwd = {}
-                if ACT_RX:
-                    fwd["/actuators"] = dict(ACT_RX)
-                if CAN_OUT:
-                    fwd["/CAN/MCU_OUT"] = CAN_OUT
+            # ---------- 4. Foxglove ----------
+            for topic, payload in topics.items():
+                await pub(topic, payload, now_ns)
+            if tick % vm.PUBLISH_DIV == 0:
+                fwd = {"/actuators": act}
+                if vm.CAN_OUT:
+                    fwd["/CAN/MCU_OUT"] = vm.CAN_OUT
                 for topic, payload in fwd.items():
-                    ch = chans.get(topic)
-                    if ch is None:
-                        ch = chans[topic] = DynamicChannel(fg_server, topic)
-                    await ch.send(now_ns, payload)
-
-                # channels of topics that no longer exist
+                    await pub(topic, payload, now_ns)
                 for topic in [t for t in chans if t not in topics and t not in fwd]:
-                    await chans.pop(topic).close()
+                    await chans.pop(topic).close()    # topic no longer used
 
-            # ---------- 3. UDP to C++ : same tree as the real VM ----------
+            # ---------- 5. UDP to C++ : same tree as the real VM ----------
             tree = {}
             for topic, payload in topics.items():
                 set_in_tree(tree, topic, payload)
             udp_sock.sendto(json.dumps(tree).encode("utf8"), UDP_TO_CPP)
 
-            # ---------- 4. pacing ----------
+            # ---------- 6. browser ----------
+            if live:
+                await broadcast_to_browsers(json.dumps({"live": live}))
+
+            # ---------- 7. pacing ----------
             tick += 1
             next_tick += dt
             delay = next_tick - time.perf_counter()

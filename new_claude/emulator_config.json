@@ -1,0 +1,223 @@
+{
+    "inputs": {
+        "throttle": {
+            "value": 0.0,
+            "min": 0.0,
+            "max": 100.0
+        },
+        "steering": {
+            "value": 0.0,
+            "min": -1.0,
+            "max": 1.0
+        },
+        "brake": {
+            "value": 0.0,
+            "min": 0.0,
+            "max": 100.0
+        }
+    },
+    "relays": {
+        "dash": true,
+        "master_panel": true,
+        "bms": true
+    },
+    "sliders": {
+        "wheel_speed_fl": {
+            "topic": "/sensors/vm",
+            "key": "wheel_speed.fl",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "wheel_speed_fr": {
+            "topic": "/sensors/vm",
+            "key": "wheel_speed.fr",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "wheel_speed_rl": {
+            "topic": "/sensors/vm",
+            "key": "wheel_speed.rl",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "wheel_speed_rr": {
+            "topic": "/sensors/vm",
+            "key": "wheel_speed.rr",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "accelerator_position": {
+            "topic": "/sensors/vm",
+            "key": "accelerator_position",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "brake_pedal_position": {
+            "topic": "/sensors/vm",
+            "key": "brake_pedal_position",
+            "value": 0.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "steering_angle": {
+            "topic": "/sensors/vm",
+            "key": "steering_angle",
+            "value": 32768.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "brake_pressure": {
+            "topic": "/sensors/vm",
+            "key": "brake_pressure",
+            "value": 16370.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "accel_x": {
+            "topic": "/sensors/vm",
+            "key": "accel_x",
+            "value": 32768.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "accel_y": {
+            "topic": "/sensors/vm",
+            "key": "accel_y",
+            "value": 32768.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "sdc_after_dash": {
+            "topic": "/sensors/other",
+            "key": "sdc_after_dash",
+            "value": 65535.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "sdc_after_vcu": {
+            "topic": "/sensors/other",
+            "key": "sdc_after_vcu",
+            "value": 65535.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "sdc_after_master_panel": {
+            "topic": "/sensors/other",
+            "key": "sdc_after_master_panel",
+            "value": 65535.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "sdc_after_bms": {
+            "topic": "/sensors/other",
+            "key": "sdc_after_bms",
+            "value": 65535.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        },
+        "sdc_after_bspd": {
+            "topic": "/sensors/other",
+            "key": "sdc_after_bspd",
+            "value": 65535.0,
+            "min": 0.0,
+            "max": 65535.0,
+            "noise": false,
+            "std_dev": 1.0,
+            "integer": true,
+            "from_vm": true,
+            "override": false
+        }
+    },
+    "buttons": {
+        "ATS_btn": {
+            "topic": "/sensors/other",
+            "key": "ATS_btn",
+            "value": false,
+            "integer": true,
+            "from_vm": true
+        },
+        "R2D_btn": {
+            "topic": "/sensors/other",
+            "key": "R2D_btn",
+            "value": false,
+            "integer": true,
+            "from_vm": true
+        }
+    },
+    "_signals_version": 2
+}

@@ -75,7 +75,7 @@ ACCEL_RANGE_G = 4.0          # accelerometer full scale: +/- this many g (positi
 
 # ---- shutdown circuit ----
 VBAT = 24.0                  # V
-SDC_ORDER = ["dash", "vcu", "master_panel", "bms", "bspd"]    # order along the line
+SDC_ORDER = ["dash", "bspd", "master_panel", "bms", "vcu"]    # order along the line
 UI_RELAYS = ["dash", "master_panel", "bms"]                   # latching buttons in the UI
 SDC_CUTS_MOTOR = True        # physics: open shutdown circuit -> motor has no torque
 BSPD_BRAKE_BAR = 30.0        # brake pressure above this = "hard braking"
