@@ -833,7 +833,9 @@ async def main():
                        master_panel=rel["master_panel"], bms=rel["bms"],
                        brake_bar=vehicle.brake_pressure_bar,
                        motor_power_w=vehicle.motor_power_w)
-            torque_cmd = act["motor_torque"] if (sdc.closed or not vm.SDC_CUTS_MOTOR) else 0.0
+            # the motor only gets torque if EVERY relay of the shutdown line is closed (model state, not sensors,
+            # so overrides of the sensor readings never change the physics)
+            torque_cmd = act["motor_torque"] if sdc.closed else 0.0
             vehicle.step(torque_cmd,
                          float(inp["steering"]["value"]),
                          float(inp["brake"]["value"]),

@@ -77,7 +77,6 @@ ACCEL_RANGE_G = 4.0          # accelerometer full scale: +/- this many g (positi
 VBAT = 24.0                  # V
 SDC_ORDER = ["dash", "bspd", "master_panel", "bms", "vcu"]    # order along the line
 UI_RELAYS = ["dash", "master_panel", "bms"]                   # latching buttons in the UI
-SDC_CUTS_MOTOR = True        # physics: open shutdown circuit -> motor has no torque
 BSPD_BRAKE_BAR = 30.0        # brake pressure above this = "hard braking"
 BSPD_POWER_W = 5_000.0       # motor power above this while hard braking = fault
 BSPD_RESET_S = 10.0          # fault must be absent this long before the relay closes again
@@ -860,7 +859,8 @@ async def main():
                        motor_power_w=vehicle.motor_power_w)
 
             # ---------- 2. vehicle model ----------
-            torque_cmd = act["motor_torque"] if (sdc.closed or not SDC_CUTS_MOTOR) else 0.0
+            # the motor only gets torque if EVERY relay of the shutdown line is closed (model state, not sensors)
+            torque_cmd = act["motor_torque"] if sdc.closed else 0.0
             vehicle.step(torque_cmd,
                          float(inp["steering"]["value"]),
                          float(inp["brake"]["value"]),
