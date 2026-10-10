@@ -1,0 +1,306 @@
+{
+  "version": 2,
+  "description": "Everything the VM sends. 'keys' are the field paths ('.' = nested object) inside the Foxglove topic; the UDP packet to C++ has the same tree.",
+  "adc": {
+    "bits": 16,
+    "max": 65535,
+    "vref_v": 3.3
+  },
+  "udp_to_cpp": "127.0.0.1:9000",
+  "udp_from_cpp": "127.0.0.1:9001",
+  "signals": [
+    {
+      "name": "wheel_speed",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "wheel_speed.fl",
+        "wheel_speed.fr",
+        "wheel_speed.rl",
+        "wheel_speed.rr"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 0,
+      "unit": "level",
+      "real_min": 0.0,
+      "real_max": 1.0,
+      "v_min": 0.0,
+      "v_max": 3.3,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "accelerator_position",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "accelerator_position"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 6554,
+      "unit": "%",
+      "real_min": 0.0,
+      "real_max": 100.0,
+      "v_min": 0.33,
+      "v_max": 2.97,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "brake_pedal_position",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "brake_pedal_position"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 6554,
+      "unit": "%",
+      "real_min": 0.0,
+      "real_max": 100.0,
+      "v_min": 0.33,
+      "v_max": 2.97,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "steering_angle",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "steering_angle"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 32768,
+      "unit": "deg",
+      "real_min": -20.05352282957881,
+      "real_max": 20.05352282957881,
+      "v_min": 0.33,
+      "v_max": 2.97,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "brake_pressure",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "brake_pressure"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 6554,
+      "unit": "bar",
+      "real_min": 0.0,
+      "real_max": 80.0,
+      "v_min": 0.33,
+      "v_max": 2.97,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "accel_x",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "accel_x"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 32768,
+      "unit": "m/s2",
+      "real_min": -39.24,
+      "real_max": 39.24,
+      "v_min": 0.33,
+      "v_max": 2.97,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "accel_y",
+      "group": "vm",
+      "topic": "/sensors/vm",
+      "kind": "adc",
+      "keys": [
+        "accel_y"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 32768,
+      "unit": "m/s2",
+      "real_min": -39.24,
+      "real_max": 39.24,
+      "v_min": 0.33,
+      "v_max": 2.97,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "sdc_after_dash",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "adc",
+      "keys": [
+        "sdc_after_dash"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 65535,
+      "unit": "V",
+      "real_min": 0.0,
+      "real_max": 24.0,
+      "v_min": 0.0,
+      "v_max": 3.3,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "sdc_after_vcu",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "adc",
+      "keys": [
+        "sdc_after_vcu"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 65535,
+      "unit": "V",
+      "real_min": 0.0,
+      "real_max": 24.0,
+      "v_min": 0.0,
+      "v_max": 3.3,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "sdc_after_master_panel",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "adc",
+      "keys": [
+        "sdc_after_master_panel"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 65535,
+      "unit": "V",
+      "real_min": 0.0,
+      "real_max": 24.0,
+      "v_min": 0.0,
+      "v_max": 3.3,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "sdc_after_bms",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "adc",
+      "keys": [
+        "sdc_after_bms"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 65535,
+      "unit": "V",
+      "real_min": 0.0,
+      "real_max": 24.0,
+      "v_min": 0.0,
+      "v_max": 3.3,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "sdc_after_bspd",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "adc",
+      "keys": [
+        "sdc_after_bspd"
+      ],
+      "raw_min": 0,
+      "raw_max": 65535,
+      "default_raw": 65535,
+      "unit": "V",
+      "real_min": 0.0,
+      "real_max": 24.0,
+      "v_min": 0.0,
+      "v_max": 3.3,
+      "rate_hz": 200,
+      "noise_lsb": 5.0
+    },
+    {
+      "name": "ATS_btn",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "digital",
+      "keys": [
+        "ATS_btn"
+      ],
+      "raw_min": 0,
+      "raw_max": 1,
+      "default_raw": 0,
+      "rate_hz": 200
+    },
+    {
+      "name": "R2D_btn",
+      "group": "other",
+      "topic": "/sensors/other",
+      "kind": "digital",
+      "keys": [
+        "R2D_btn"
+      ],
+      "raw_min": 0,
+      "raw_max": 1,
+      "default_raw": 0,
+      "rate_hz": 200
+    }
+  ],
+  "actuators_received_from_cpp": {
+    "topic": "/actuators",
+    "fields": [
+      {
+        "name": "motor_torque",
+        "type": "number",
+        "unit": "Nm",
+        "min": 0.0,
+        "max": 600.0
+      },
+      {
+        "name": "TS_activated_led",
+        "type": "boolean",
+        "unit": ""
+      },
+      {
+        "name": "R2D_LED",
+        "type": "boolean",
+        "unit": ""
+      },
+      {
+        "name": "sdc_vcu_relay",
+        "type": "boolean",
+        "unit": ""
+      },
+      {
+        "name": "brake_light",
+        "type": "boolean",
+        "unit": ""
+      }
+    ]
+  },
+  "can": {
+    "mcu_out": "/CAN/MCU_OUT",
+    "mcu_in": "/CAN/MCU_IN"
+  }
+}

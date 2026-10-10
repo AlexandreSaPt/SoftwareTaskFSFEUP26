@@ -1,4 +1,48 @@
 {
+    "inputs": {
+        "throttle": {
+            "value": 10.0340831629175,
+            "min": 0.0,
+            "max": 100.0
+        },
+        "steering": {
+            "value": 0.0,
+            "min": -1.0,
+            "max": 1.0
+        },
+        "brake": {
+            "value": 22.348450422612,
+            "min": 0.0,
+            "max": 100.0
+        }
+    },
+    "noise": {
+        "wheel_speed": {
+            "value": 220.313565098841,
+            "min": 0.0,
+            "max": 500.0
+        },
+        "accelerator_position": {
+            "value": 163.849125198818,
+            "min": 0.0,
+            "max": 500.0
+        },
+        "brake_pedal_position": {
+            "value": 5.58938471326002,
+            "min": 0.0,
+            "max": 500.0
+        },
+        "steering_angle": {
+            "value": 0.0,
+            "min": 0.0,
+            "max": 500.0
+        },
+        "brake_pressure": {
+            "value": 208.92978868439,
+            "min": 0.0,
+            "max": 500.0
+        }
+    },
     "sliders": {
         "A": {
             "value": 54.8525396574678,

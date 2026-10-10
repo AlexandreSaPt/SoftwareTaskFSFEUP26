@@ -1,12 +1,23 @@
 ## Python SDK setup
 
-These instructions are for Fedora Linux.Should work with Debian with correct modifications
-
 ### 1. Install the system dependencies
 
+On Fedora
+
 ```bash
-sudo dnf install python3
+sudo dnf check-update
+sudo dnf install python3 json-devel
 ```
+
+On Debain
+```bash
+sudo apt update
+ sudo apt install python3 nlohmann-json3-dev
+
+
+```
+
+
 
 ### 2. Create and activate a virtual environment
 
